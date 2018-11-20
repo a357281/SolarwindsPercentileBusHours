@@ -1,0 +1,49 @@
+USE [SolarWindsOrion4]
+GO
+/****** Object:  UserDefinedFunction [dbo].[GetInBpsPercentileOpsHours]    Script Date: 20/11/2018 13:53:43 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+
+ALTER FUNCTION [dbo].[GetInBpsPercentileOpsHours] 
+(
+	@InterfaceId int,
+	@StartDate DateTime,
+	@EndDate DateTime,
+	@Percentile int,
+	@StartBusinessHours DateTime,
+	@EndBusinessHours DateTime
+
+)
+RETURNS real
+AS
+BEGIN
+	DECLARE @ResultVar real	
+
+SELECT @ResultVar = MAX(In_Averagebps)
+	FROM (
+		SELECT TOP(@Percentile) PERCENT In_Averagebps
+		FROM dbo.InterfaceTraffic_Detail
+		INNER JOIN Interfaces on InterfaceTraffic_Detail.InterfaceID = Interfaces.InterfaceID
+
+		WHERE interfaces.InterfaceID = @InterfaceId AND DateTime >= @StartDate AND DateTime <= @EndDate
+		AND 
+		(
+        -- This adjusts for both the timezone of the samples and the target device
+        -- Not Saturday or Sunday after adjusting for timezones
+        (DATEPART(dw,DATEADD(hh,+Interfaces.GMTOffset,DateTime)) <> 1 AND (DATEPART(dw,DATEADD(hh,+Interfaces.GMTOffset,DateTime)) <> 7) )
+		AND 
+        -- Between @StartBusinessHours and @EndBusinessHours after adjusting for timezones
+        (DATEPART(Hour,DATEADD(hh,+Interfaces.GMTOffset,DateTime)) >= @StartBusinessHours AND (DATEPART(Hour,DATEADD(hh,+Interfaces.GMTOffset,DateTime)) <= @EndBusinessHours))
+        )
+		ORDER BY In_Averagebps ASC
+	) AS AA
+
+	RETURN @ResultVar
+
+END
+
+
