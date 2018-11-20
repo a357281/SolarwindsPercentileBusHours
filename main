@@ -1,0 +1,57 @@
+  
+        DECLARE @StartDate DateTime
+        DECLARE @EndDate DateTime
+		    DECLARE @TargetDeviceOffset Float
+        DECLARE @TargetPercentile Float
+		    DECLARE @StartBusinessHours Float
+		    DECLARE @EndBusinessHours Float
+
+		    --SET @TargetDeviceOffset = 8.0
+		    SET @StartBusinessHours = 7
+		    SET @EndBusinessHours = 18
+        SET @StartDate = ${FromTime}
+        SET @EndDate = ${ToTime}
+
+        SELECT	Interfaces.InterfaceId,
+        Nodes.NodeID,
+        Nodes.Caption AS NodeName,
+		    Nodes.Region AS Region,
+		    Nodes.Site AS Site,
+        Interfaces.Caption AS Interface_Caption, 
+        Interfaces.InterfaceSpeed AS Interface_Bandwidth,
+		    --Interfaces.GMTOffset AS GMT_Offset,
+		    Maxbps_In90,
+        Maxbps_Out90,
+        Maxbps_In95,
+        Maxbps_Out95,
+        Maxbps_In99,
+        Maxbps_Out99,
+        ROUND (Maxbps_In95 * 100.0 / Interfaces.InterfaceSpeed, 1) AS Maxbps_In95perc,
+        ROUND (Maxbps_Out95 * 100.0 / Interfaces.InterfaceSpeed, 1) AS Maxbps_Out95perc
+
+        FROM Nodes
+        INNER JOIN Interfaces ON Nodes.NodeID = Interfaces.NodeID
+        INNER JOIN (
+
+
+        SELECT InterfaceID,
+        dbo.GetInBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,90, @StartBusinessHours, @EndBusinessHours) AS Maxbps_In90,
+        dbo.GetOutBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,90, @StartBusinessHours, @EndBusinessHours) AS Maxbps_Out90,
+        dbo.GetInBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,95, @StartBusinessHours, @EndBusinessHours) AS Maxbps_In95,
+        dbo.GetOutBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,95, @StartBusinessHours, @EndBusinessHours) AS Maxbps_Out95,
+        dbo.GetInBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,99, @StartBusinessHours, @EndBusinessHours) AS Maxbps_In99,
+        dbo.GetOutBpsPercentileOpsHours(InterfaceID, @StartDate, @EndDate,99, @StartBusinessHours, @EndBusinessHours) AS Maxbps_Out99
+        FROM InterfaceTraffic
+
+
+        WHERE InterfaceTraffic.DateTime >= @StartDate AND InterfaceTraffic.DateTime <= @EndDate
+
+	       
+
+        GROUP BY InterfaceID
+        ) TrafficStat
+        ON Interfaces.InterfaceID = TrafficStat.InterfaceID
+       WHERE INT_FIL_TOPOLOGY like 'APACTIER1' AND A_B_End like 'A_End'
+
+
+ ORDER BY NodeName, Interface_Caption
